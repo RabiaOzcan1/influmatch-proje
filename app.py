@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 
 # 1. Sayfa Yapılandırması (Her zaman en üstte olmalı)
-st.set_page_config(page_title="InfluMatch AI Pro v7.0 🚀", layout="wide")
+st.set_page_config(page_title="InfluMatch AI Pro v9.0 🚀", layout="wide")
 
 # 2. Oturum Durumu Kontrolü (Giriş Yapıldı mı?)
 if 'logged_in' not in st.session_state:
@@ -165,7 +165,7 @@ else:
 
     with tab2:
         st.header("🧠 Akıllı Eşleştirme Motoru")
-        with st.form("wizard_form_v7"):
+        with st.form("wizard_form_v8"):
             w_sektor = st.selectbox("🎯 Hedef Sektör", df["sektor"].unique())
             w_hedef = st.radio("🚀 Kampanya Amacı", ["Satış Yapmak", "Bilinirlik Kazanmak"])
             w_tipler = st.multiselect("📊 İstenilen Segmentler", list(df["tip"].unique()), default=list(df["tip"].unique()))
@@ -186,79 +186,124 @@ else:
             st.plotly_chart(fig, use_container_width=True)
         st.dataframe(f_df, use_container_width=True)
 
+    # --- TAB 4: MOD SEÇİMLİ VE YASAL DESTEKLİ AI MOTORU ---
     with tab4:
-        st.header("🤖 Akıllı Reklam Senaryosu ve Öneri Sistemi")
-        st.markdown("Kampanya hedeflerinizi yazın. Sistem, seçtiğiniz sektöre göre alakasız tüm influencer'ları temizledikten sonra sadece doğru isimleri yapay zekaya gönderir.")
+        st.header("🤖 InfluMatch Akıllı AI Asistanı")
         
-        # Kritik Filtreleme Kutuları
-        kampanya_sektoru = st.selectbox("🎯 Reklam Yapacağınız Sektör Nedir?", options=sorted(list(df["sektor"].unique())))
-        
-        kampanya_butcesi = st.selectbox(
-            "💰 Kampanya Bütçeniz Nedir?",
-            options=["Düşük Bütçe (Nano)", "Orta-Düşük Bütçe (Nano & Micro)", "Orta Bütçe (Micro)", "Orta-Yüksek Bütçe (Macro & Mega)", "Yüksek Bütçe (Mega)"]
+        # YENİ ÖZELLİK: Çalışma Modu Seçimi
+        ai_modu = st.radio(
+            "💡 Yapay Zekayı Hangi Amaçla Kullanmak İstersiniz?",
+            options=["🎯 Reklam Senaryosu ve Influencer Önerisi Al", "⚖️ Sadece Yasal Soru Sor (Mevzuat Danışmanı)"],
+            horizontal=True
         )
         
-        user_prompt = st.text_area("📝 Kampanya Detaylarını ve İsteklerinizi Yazın:", placeholder="Örn: Yeni mobil oyunumuz için bütçemize uygun reklam senaryoları...")
+        st.divider()
         
-        if st.button("🚀 Yapay Zeka Analizini Başlat", key="groq_v7_start"):
-            if not user_prompt:
-                st.warning("⚠️ Lütfen kampanya detaylarını boş bırakmayın.")
-            else:
-                with st.spinner("🧠 Yapay zeka alakasız tüm sektörleri (Yemek, Moda vb.) eliyor..."):
-                    try:
-                        # 1. Aşama: Python Düzeyinde Bütçe Filtrelemesi
-                        ai_df = df.copy()
-                        if "Düşük Bütçe (Nano)" in kampanya_butcesi:
-                            ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Nano", case=False, na=False)]
-                        elif "Orta-Düşük Bütçe (Nano & Micro)" in kampanya_butcesi:
-                            ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Nano|Micro", case=False, na=False)]
-                        elif "Orta Bütçe (Micro)" in kampanya_butcesi:
-                            ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Micro", case=False, na=False)]
-                        elif "Orta-Yüksek Bütçe (Macro & Mega)" in kampanya_butcesi:
-                            ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Macro|Mega", case=False, na=False)]
-                        elif "Yüksek Bütçe (Mega)" in kampanya_butcesi:
-                            ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Mega", case=False, na=False)]
+        # Eğer Reklam Senaryosu seçilirse filtreleri göster
+        if ai_modu == "🎯 Reklam Senaryosu ve Influencer Önerisi Al":
+            st.markdown("Kampanya hedeflerinizi yazın. Sistem, seçtiğiniz sektöre göre verileri süzerek nokta atışı senaryo kurgular.")
+            
+            kampanya_sektoru = st.selectbox("🎯 Reklam Yapacağınız Sektör Nedir?", options=sorted(list(df["sektor"].unique())))
+            
+            kampanya_butcesi = st.selectbox(
+                "💰 Kampanya Bütçeniz Nedir?",
+                options=["Düşük Bütçe (Nano)", "Orta-Düşük Bütçe (Nano & Micro)", "Orta Bütçe (Micro)", "Orta-Yüksek Bütçe (Macro & Mega)", "Yüksek Bütçe (Mega)"]
+            )
+            
+            user_prompt = st.text_area("📝 Kampanya Detaylarını ve İsteklerinizi Yazın:", placeholder="Örn: Yeni mobil oyunumuz için bütçemize uygun reklam senaryoları...")
+            
+            if st.button("🚀 Yapay Zeka Analizini Başlat", key="groq_senaryo_start"):
+                if not user_prompt:
+                    st.warning("⚠️ Lütfen kampanya detaylarını boş bırakmayın.")
+                else:
+                    with st.spinner("🧠 Yapay zeka alakasız tüm sektörleri eliyor ve bütçeyi optimize ediyor..."):
+                        try:
+                            ai_df = df[df["sektor"].astype(str).str.contains(kampanya_sektoru, case=False, na=False)].copy()
+                            
+                            if ai_df.empty:
+                                st.error(f"❌ Veri tabanında '{kampanya_sektoru}' sektörüne ait hiçbir influencer bulunamadı.")
+                                st.stop()
+                            
+                            bütçe_notu = ""
+                            if "Düşük Bütçe (Nano)" in kampanya_butcesi:
+                                temp_df = ai_df[ai_df["tip"].astype(str).str.contains("Nano", case=False, na=False)]
+                                if temp_df.empty:
+                                    ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Micro", case=False, na=False)]
+                                    bütçe_notu = "⚠️ Not: Seçtiğiniz sektörde 'Nano' influencer bulunmadığı için sistem otomatik olarak en yakın bütçeli 'Micro' segmentine geçiş yapmıştır."
+                                else:
+                                    ai_df = temp_df
+                            elif "Orta-Düşük Bütçe (Nano & Micro)" in kampanya_butcesi:
+                                ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Nano|Micro", case=False, na=False)]
+                            elif "Orta Bütçe (Micro)" in kampanya_butcesi:
+                                ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Micro", case=False, na=False)]
+                            elif "Orta-Yüksek Bütçe (Macro & Mega)" in kampanya_butcesi:
+                                ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Macro|Mega", case=False, na=False)]
+                            elif "Yüksek Bütçe (Mega)" in kampanya_butcesi:
+                                ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Mega", case=False, na=False)]
 
-                        # 2. Aşama: Kod Seviyesinde KESİN Sektör Filtrelemesi
-                        ai_df = ai_df[ai_df["sektor"].astype(str).str.contains(kampanya_sektoru, case=False, na=False)]
-
-                        if ai_df.empty:
-                            st.error(f"❌ Veri tabanında '{kampanya_sektoru}' sektörüne ait ve '{kampanya_butcesi}' aralığında bir influencer bulunamadı.")
-                        else:
+                            if ai_df.empty:
+                                st.error(f"❌ Kriterlerinize uygun bir influencer kombinasyonu bulunamadı.")
+                            else:
+                                from groq import Groq
+                                api_key = st.secrets.get("GROQ_API_KEY", None)
+                                if api_key:
+                                    client = Groq(api_key=api_key)
+                                    veri_ozeti = ai_df[['ad', 'sektor', 'tip', 'platform', 'takipci', 'etkilesim', 'SMS']].to_string(index=False)
+                                    
+                                    kullanici_mesaji = f"""
+                                    Sen uzman bir dijital pazarlama direktörüsün. Kullanıcı sadece '{kampanya_sektoru}' alanında çalışıyor.
+                                    Veri kümesi: {veri_ozeti}
+                                    İstek: {user_prompt}
+                                    Görev: Sadece listedeki kişileri kullanarak '{kampanya_sektoru}' odaklı kreatif reklam senaryoları yaz ve bakanlık mevzuat uyarılarını ekle.
+                                    """
+                                    completion = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": kullanici_mesaji}], temperature=0.1)
+                                    st.success("🎉 Senaryo Raporu Hazır!")
+                                    if bütçe_notu: st.warning(bütçe_notu)
+                                    st.markdown("---")
+                                    st.markdown(completion.choices[0].message.content)
+                        except Exception as e:
+                            st.error(f"Hata: {e}")
+                            
+        # YENİ ÖZELLİK: Eğer Yasal Soru Sor seçilirse bütçe/sektör gizlenir, sadece soru alanı kalır
+        else:
+            st.markdown("### ⚖️ T.C. Ticaret Bakanlığı Reklam ve Influencer Mevzuat Danışmanı")
+            st.markdown("Gizli reklam yasakları, sosyal medyada hashtag kullanımı (`#işbirliği`), sponsorlu içerik kuralları veya ceza maddeleri hakkında merak ettiğiniz her şeyi sorun.")
+            
+            yasal_soru = st.text_area("❓ Sormak İstediğiniz Yasal Soru/Mevzuat Nedir?", placeholder="Örn: Instagram hikayelerinde iş birliği etiketi nereye konulmalı, uymamanın cezası nedir?")
+            
+            if st.button("⚖️ Kanun ve Mevzuata Göre İncele", key="groq_yasal_start"):
+                if not yasal_soru:
+                    st.warning("⚠️ Lütfen yasal sorunuzu buraya yazın.")
+                else:
+                    with st.spinner("📜 Resmi Gazete ve Ticaret Bakanlığı kılavuzları taranıyor..."):
+                        try:
                             from groq import Groq
                             api_key = st.secrets.get("GROQ_API_KEY", None)
-                            
                             if not api_key:
-                                st.error("❌ GROQ_API_KEY bulunamadı! Lütfen Streamlit Cloud Secrets ayarlarınızı kontrol edin.")
+                                st.error("❌ GROQ_API_KEY bulunamadı!")
                             else:
                                 client = Groq(api_key=api_key)
-                                veri_ozeti = ai_df[['ad', 'sektor', 'tip', 'platform', 'takipci', 'etkilesim', 'SMS']].to_string(index=False)
                                 
-                                kullanici_mesaji = f"""
-                                Sen uzman bir dijital pazarlama direktörüsün.
-                                Kullanıcı şu an sadece '{kampanya_sektoru}' sektöründe bir reklam çalışması yapmaktadır.
+                                yasal_mesaj = f"""
+                                Sen Türkiye Cumhuriyeti Ticaret Bakanlığı Reklam Kurulu mevzuatlarına, Influencer Bilgilendirme Kılavuzu'na ve Reklam Kanunu'na tamamen hakim bir hukuk ve dijital pazarlama danışmanısın.
                                 
-                                Sana veri tabanından filtrelenerek gelen SADECE '{kampanya_sektoru}' alanındaki influencer listesi:
-                                {veri_ozeti}
+                                Kullanıcı sana şu soruyu sordu:
+                                "{yasal_soru}"
                                 
-                                Kullanıcının İstemi: "{user_prompt}"
-                                
-                                Görevin:
-                                1. Yukarıdaki listedeki influencer isimlerini kullanarak nokta atışı ortaklıklar öner. Yemek, Gıda, Yaşam Tarzı gibi alakasız sektörlerden asla isim seçme.
-                                2. Önerdiğin isimler için tamamen '{kampanya_sektoru}' konseptine uygun kreatif reklam senaryoları yaz.
-                                3. Ticaret Bakanlığı reklam kuralları uyarısı ekle.
+                                Lütfen bu soruyu şu kurallara göre cevapla:
+                                1. Net ve yasal maddelere dayanan (Örn: Sosyal Medya Etkileyicileri Tarafından Yapılan Ticari Reklam ve Haksız Ticari Uygulamalar Hakkında Kılavuz) bilgiler ver.
+                                2. #İşbirliği, #Reklam gibi etiketlerin hangi platformda (YouTube, Instagram, TikTok vb.) nasıl, hangi boyutta ve nerede konumlandırılması gerektiğini açıkla.
+                                3. Olası ihlal durumunda Reklam Kurulu'nun uygulayabileceği idari para cezası veya durdurma cezası risklerinden bahset.
+                                4. Tamamen Türkçe ve profesyonel bir hukuki/danışmanlık dili kullan.
                                 """
                                 
                                 completion = client.chat.completions.create(
                                     model="llama-3.3-70b-versatile",
-                                    messages=[{"role": "user", "content": kullanici_mesaji}],
+                                    messages=[{"role": "user", "content": yasal_mesaj}],
                                     temperature=0.1
                                 )
-                                
-                                ai_raporu = completion.choices[0].message.content
-                                st.success("🎉 Seçilen Sektör ve Bütçeyle %100 Uyumlu Rapor Hazır!")
+                                st.success("⚖️ Hukuki Mevzuat Analizi Tamamlandı!")
                                 st.markdown("---")
-                                st.markdown(ai_raporu)
-                                
-                    except Exception as ai_err:
-                        st.error(f"❌ AI Analiz Hatası: {ai_err}")
+                                st.markdown(completion.choices[0].message.content)
+                        except Exception as e:
+                            st.error(f"AI Bağlantı Hatası: {e}")
