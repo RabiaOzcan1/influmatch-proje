@@ -145,21 +145,110 @@ else:
                         m2.metric("⚡ Etkileşim", f"%{row['etkilesim']}")
                         st.link_button("🌐 Profili Gör", get_social_link(row['ad'], row['platform']), use_container_width=True)
 
+    # --- TAB 2: SADECE KUTULU EN UYGUN VE EN KÖTÜ ADAY ANALİZİ ---
     with tab2:
         st.header("🧠 Akıllı Eşleştirme Motoru")
-        with st.form("wizard_form_v8"):
-            w_sektor = st.selectbox("🎯 Hedef Sektör", df["sektor"].unique(), key="w_sec_tab2")
-            w_hedef = st.radio("🚀 Kampanya Amacı", ["Satış Yapmak", "Bilinirlik Kazanmak"])
+        with st.form("wizard_form_v9_fixed"):
+            w_sektor = st.selectbox("🎯 Hedef Sektör", sorted(list(df["sektor"].unique())))
+            w_hedef = st.radio("🚀 Kampanya Amacı", ["Satış Yapmak (Dönüşüm Odaklı)", "Bilinirlik Kazanmak (Erişim Odaklı)"])
             w_tipler = st.multiselect("📊 İstenilen Segmentler", list(df["tip"].unique()), default=list(df["tip"].unique()))
             submit_wizard = st.form_submit_button("⚡ Aday Performans Kıyaslamasını Başlat")
 
         if submit_wizard:
             res = df[(df["sektor"] == w_sektor) & (df["tip"].isin(w_tipler))]
-            if len(res) >= 1:
-                best = res.sort_values(by="SMS", ascending=False).iloc[0]
-                st.success(f"🥇 EN UYGUN ADAY: {best['ad']} (Smart-Match Skoru: {best['SMS']}/100)")
-            else:
-                st.warning("⚠️ Seçilen kriterlere uygun influencer bulunamadı.")
+            if res.empty:
+                st.warning("⚠️ Seçilen kriterlere uygun influencer bulunamadı. Genel veri kümesi taranıyor...")
+                res = df.copy()
+            
+            best_math = res.sort_values(by="SMS", ascending=False).iloc[0]
+            st.success(f"🥇 MATEMATİKSEL EN UYGUN ADAY: {best_math['ad']} (Smart-Match Skoru: {best_math['SMS']}/100)")
+            
+            st.markdown("---")
+            with st.spinner("🧠 Yapay zeka verileri süzüyor, En Uygun ve En Riskli aday kartlarını hazırlıyor..."):
+                try:
+                    import json
+                    from groq import Groq
+                    
+                    api_key = st.secrets.get("GROQ_API_KEY", None)
+                    if not api_key:
+                        st.error("❌ `secrets.toml` içerisinde GROQ_API_KEY anahtarı bulunamadı!")
+                    else:
+                        client = Groq(api_key=api_key)
+                        veri_ozeti = res[['ad', 'sektor', 'tip', 'platform', 'takipci', 'etkilesim', 'SMS']].to_string(index=False)
+                        
+                        sistem_talimati = f"""
+                        Sen dijital pazarlama veri analistisin. Verilen veri kümesinden en uygun ve en riskli influencer'ları seçmelisin.
+                        Senden çıktıyı MUTLAKA ve sadece aşağıdaki JSON formatında vermeni istiyorum. Başka hiçbir açıklama yazma.
+
+                        {{
+                            "en_uygun_isim": "Maksimum verim sağlayacak influencer'ın sadece adı ve soyadı",
+                            "en_uygun_sms": 96.4,
+                            "en_uygun_segment": "Adayın segment metni",
+                            "en_uygun_platform": "Instagram veya TikTok",
+                            "en_uygun_takipci": "737,000",
+                            "en_uygun_etkilesim": "%11.5",
+                            "en_uygun_neden": "Detaylı matematiksel seçim nedeni açıklaması",
+                            "en_riskli_isim": "En az uygun / yüksek riskli influencer'ın sadece adı ve soyadı",
+                            "en_riskli_sms": 73.0,
+                            "en_riskli_segment": "Adayın segment metni",
+                            "en_riskli_platform": "Instagram veya TikTok",
+                            "en_riskli_takipci": "1,100,000",
+                            "en_riskli_etkilesim": "%4.5",
+                            "en_riskli_neden": "Neden riskli ve uygun olmadığının detaylı açıklaması"
+                        }}
+
+                        Veri kümesi:
+                        {veri_ozeti}
+                        """
+                        
+                        completion = client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=[{"role": "user", "content": sistem_talimati + f"\nSektör: {w_sektor}, Hedef: {w_hedef}"}],
+                            temperature=0.2,
+                            response_format={"type": "json_object"}
+                        )
+                        
+                        cevap_json = json.loads(completion.choices[0].message.content)
+                        
+                        # O meşhur görseldeki yeşil ve kırmızı kutu tasarımları
+                        col_iyi, col_kötü = st.columns(2)
+                        
+                        with col_iyi:
+                            st.markdown('<div style="background-color:#E8F5E9; padding:10px; border-radius:5px;"><h3 style="color:#2E7D32; margin:0;">🟢 EN UYGUN ADAY (Maksimum Verim)</h3></div>', unsafe_allow_html=True)
+                            with st.container(border=True):
+                                st.markdown(f"### ✨ {cevap_json.get('en_uygun_isim')}")
+                                st.markdown(f"📊 Smart-Match Skoru: {cevap_json.get('en_uygun_sms')} / 100")
+                                try: st.progress(float(cevap_json.get('en_uygun_sms')) / 100)
+                                except: st.progress(0.95)
+                                st.caption(f"Segment: {cevap_json.get('en_uygun_segment')} | Platform: {cevap_json.get('en_uygun_platform')}")
+                                
+                                st.markdown("<br><small>Takipçi Sayısı</small>", unsafe_allow_html=True)
+                                st.markdown(f"## {cevap_json.get('en_uygun_takipci')}")
+                                st.markdown("<small>Etkileşim Oranı</small>", unsafe_allow_html=True)
+                                st.markdown(f"## {cevap_json.get('en_uygun_etkilesim')}")
+                                
+                                st.info(cevap_json.get('en_uygun_neden'))
+                                st.link_button(f"🔗 {cevap_json.get('en_uygun_isim')} Profilini İncele", get_social_link(cevap_json.get('en_uygun_isim'), cevap_json.get('en_uygun_platform', 'Instagram')), use_container_width=True)
+                                
+                        with col_kötü:
+                            st.markdown('<div style="background-color:#FFEBEE; padding:10px; border-radius:5px;"><h3 style="color:#C62828; margin:0;">🔴 EN AZ UYGUN ADAY (Yüksek Risk / Düşük Verim)</h3></div>', unsafe_allow_html=True)
+                            with st.container(border=True):
+                                st.markdown(f"### ⚠️ {cevap_json.get('en_riskli_isim')}")
+                                st.markdown(f"📊 Smart-Match Skoru: {cevap_json.get('en_riskli_sms')} / 100")
+                                try: st.progress(float(cevap_json.get('en_riskli_sms')) / 100)
+                                except: st.progress(0.70)
+                                st.caption(f"Segment: {cevap_json.get('en_riskli_segment')} | Platform: {cevap_json.get('en_riskli_platform')}")
+                                
+                                st.markdown("<br><small>Takipçi Sayısı</small>", unsafe_allow_html=True)
+                                st.markdown(f"## {cevap_json.get('en_riskli_takipci')}")
+                                st.markdown("<small>Etkileşim Oranı</small>", unsafe_allow_html=True)
+                                st.markdown(f"## {cevap_json.get('en_riskli_etkilesim')}")
+                                
+                                st.warning(cevap_json.get('en_riskli_neden'))
+                                st.link_button(f"🔗 {cevap_json.get('en_riskli_isim')} Profilini İncele", get_social_link(cevap_json.get('en_riskli_isim'), cevap_json.get('en_riskli_platform', 'Instagram')), use_container_width=True)
+                                
+                except Exception as e:
+                    st.error(f"Sihirbaz Yapay Zeka Hatası: {e}")
 
     with tab3:
         st.header("📈 Matematiksel Dağılım ve Matris Analizi")
@@ -168,175 +257,108 @@ else:
             st.plotly_chart(fig, use_container_width=True)
         st.dataframe(f_df, use_container_width=True)
 
-    # --- TAB 4: DÜNKİ GİBİ HEM REKLAM SENARYOSU HEM DE YASAL DANIŞMAN OLAN PANEL ---
+    # --- TAB 4: TAMAMEN SENİN İSTEDİĞİN GİBİ BÜTÇE AYARLI REKLAM SENARYOSU & YASAL DANIŞMAN ---
     with tab4:
-        st.header("🤖 InfluMatch Akıllı AI Asistanı & Sihirbazı")
+        st.header("🧠 Akıllı Reklam Senaryosu, Öneri ve Yasal Danışman")
+        st.markdown("Kampanya fikrinizi ve hedef kitlenizi yazın. AI, seçtiğiniz **bütçe aralığına tam uyan** influencer sınıflarını veritabanından süzerek size özel bir strateji ve yasal uyum raporu hazırlar.")
         
-        # Seçim Butonları (Dün yaptığımız radyo butonlu yapı)
-        ai_modu = st.radio(
-            "💡 Yapay Zekayı Hangi Amaçla Kullanmak İstersiniz?",
-            options=["🎯 Reklam Senaryosu ve Influencer Önerisi Al", "⚖️ Sadece Yasal Soru Sor (Mevzuat Danışmanı)"],
-            horizontal=True,
-            key="ai_mode_selector"
+        # --- GÜNCEL BÜTÇE SKALASI ---
+        kampanya_butcesi = st.selectbox(
+            "Kampanya Bütçeniz Nedir?",
+            options=[
+                "Düşük Bütçe (Nano)", 
+                "Orta-Düşük Bütçe (Nano & Micro)", 
+                "Orta Bütçe (Micro)", 
+                "Orta-Yüksek Bütçe (Macro & Mega)", 
+                "Yüksek Bütçe (Mega)"
+            ],
+            help="Seçtiğiniz bütçe aralığına uygun influencer tipleri yapay zekaya kesin kural olarak dikte edilir.",
+            key="groq_budget_selector"
         )
         
-        st.divider()
+        user_prompt = st.text_area(
+            "Kampanya Detaylarını ve Hedef Kitleyi Yazın:",
+            placeholder="Örn: Yeni bir kozmetik markası çıkarıyoruz. Hedef kitlemiz 18-45 yaş arası ve kozmetik alanı. TikTok ve Instagram ana mecralarım. Muhtemel reklam senaryoları ve dikkat etmem gereken yasal zorunluluklar nelerdir?",
+            key="groq_user_prompt"
+        )
         
-        if ai_modu == "🎯 Reklam Senaryosu ve Influencer Önerisi Al":
-            st.markdown("Kampanya hedeflerinizi yazın. Sistem, seçtiğiniz bütçeye ve sektöre göre verileri süzerek **En İdeal** ve **En Riskli** adayları belirler.")
-            
-            kampanya_sektoru = st.selectbox("🎯 Reklam Yapacağınız Sektör Nedir?", options=sorted(list(df["sektor"].unique())), key="ai_sector")
-            kampanya_butcesi = st.selectbox(
-                "💰 Kampanya Bütçeniz Nedir?",
-                options=["Düşük Bütçe (Nano)", "Orta-Düşük Bütçe (Nano & Micro)", "Orta Bütçe (Micro)", "Orta-Yüksek Bütçe (Macro & Mega)", "Yüksek Bütçe (Mega)"],
-                key="ai_budget"
-            )
-            user_prompt = st.text_area("📝 Kampanya Detaylarını ve İsteklerinizi Yazın:", placeholder="Örn: Yeni kozmetik serimiz için bütçemize uygun reklam senaryoları ve isim önerileri...", key="ai_prompt")
-            
-            if st.button("🚀 Yapay Zeka Analizini Başlat", key="groq_senaryo_start"):
-                if not user_prompt:
-                    st.warning("⚠️ Lütfen kampanya detaylarını boş bırakmayın.")
-                else:
-                    with st.spinner("🧠 Yapay zeka verileri analiz ediyor ve kartları oluşturuyor..."):
-                        try:
-                            import json
-                            from groq import Groq
+        if st.button("Yapay Zeka Analizini Başlat 🚀", key="groq_start_button"):
+            if not user_prompt:
+                st.warning("Lütfen önce kampanya detaylarını yazın.")
+            else:
+                with st.spinner("Yapay Zeka bütçe filtrenize uygun analizleri hazırlıyor..."):
+                    try:
+                        from groq import Groq
+                        api_key = st.secrets.get("GROQ_API_KEY", None)
+                        
+                        if not api_key:
+                            st.error("Lütfen `.streamlit/secrets.toml` dosyasına GROQ_API_KEY anahtarınızı ekleyin.")
+                        else:
+                            client = Groq(api_key=api_key)
                             
-                            ai_df = df[df["sektor"].astype(str).str.contains(kampanya_sektoru, case=False, na=False)].copy()
-                            if ai_df.empty:
-                                ai_df = df.copy()
+                            # Veritabanının özetini çıkartma
+                            veri_ozeti = f_df[['ad', 'sektor', 'tip', 'platform', 'takipci', 'etkilesim', 'SMS']].to_string(index=False)
                             
-                            api_key = st.secrets.get("GROQ_API_KEY", None)
-                            if not api_key:
-                                st.error("❌ `secrets.toml` içerisinde GROQ_API_KEY anahtarı bulunamadı!")
-                            else:
-                                client = Groq(api_key=api_key)
-                                veri_ozeti = ai_df[['ad', 'sektor', 'tip', 'platform', 'takipci', 'etkilesim', 'SMS']].to_string(index=False)
-                                
-                                sistem_talimati = f"""
-                                Sen dijital pazarlama veri analistisin. Verilen veri kümesinden en uygun ve en riskli influencer'ları seçmelisin.
-                                Senden çıktıyı tam olarak aşağıdaki JSON formatında vermeni istiyorum. Alanların içerisindeki verileri eksiksiz doldur.
-
-                                {{
-                                    "en_uygun_isim": "Maksimum verim sağlayacak influencer'ın sadece adı ve soyadı",
-                                    "en_uygun_sms": 96.4,
-                                    "en_uygun_segment": "Adayın segment metni",
-                                    "en_uygun_platform": "Instagram veya TikTok",
-                                    "en_uygun_takipci": "737,000",
-                                    "en_uygun_etkilesim": "%11.5",
-                                    "en_uygun_neden": "Açıklama metni",
-                                    "en_riskli_isim": "En az uygun / yüksek riskli influencer'ın sadece adı ve soyadı",
-                                    "en_riskli_sms": 73.0,
-                                    "en_riskli_segment": "Adayın segment metni",
-                                    "en_riskli_platform": "Instagram veya TikTok",
-                                    "en_riskli_takipci": "1,100,000",
-                                    "en_riskli_etkilesim": "%4.5",
-                                    "en_riskli_neden": "Açıklama metni",
-                                    "kreatif_senaryolar": "Video senaryo kurguları",
-                                    "yasal_zorunluluklar": "Ticaret bakanlığı kuralları"
-                                }}
-
-                                Veri kümesi:
-                                {veri_ozeti}
-                                """
-                                
-                                completion = client.chat.completions.create(
-                                    model="llama-3.3-70b-versatile",
-                                    messages=[{"role": "user", "content": sistem_talimati + f"\nKullanıcı isteği: {user_prompt}\nSektör: {kampanya_sektoru}, Bütçe Segmenti: {kampanya_butcesi}"}],
-                                    temperature=0.2,
-                                    response_format={"type": "json_object"}
-                                )
-                                
-                                cevap_json = json.loads(completion.choices[0].message.content)
-                                
-                                st.success("✨ Yapay Zeka Stratejik Analizi Tamamlandı!")
-                                st.markdown("---")
-                                
-                                # --- 1. KISIM: GÖRSEL KUTU TASARIMLI KARTLAR ---
-                                st.subheader("🎯 AI Insight: Sihirbaz Eşleştirmesi")
-                                col_iyi, col_kötü = st.columns(2)
-                                
-                                with col_iyi:
-                                    st.markdown('<div style="background-color:#E8F5E9; padding:10px; border-radius:5px;"><h3 style="color:#2E7D32; margin:0;">🟢 EN UYGUN ADAY (Maksimum Verim)</h3></div>', unsafe_allow_html=True)
-                                    with st.container(border=True):
-                                        st.markdown(f"### ✨ {cevap_json.get('en_uygun_isim')}")
-                                        st.markdown(f"📊 Smart-Match Skoru: {cevap_json.get('en_uygun_sms', 95.0)} / 100")
-                                        try: st.progress(float(cevap_json.get('en_uygun_sms')) / 100)
-                                        except: st.progress(0.95)
-                                        st.caption(f"Segment: {cevap_json.get('en_uygun_segment')} | Platform: {cevap_json.get('en_uygun_platform')}")
-                                        
-                                        st.markdown("<br><small>Takipçi Sayısı</small>", unsafe_allow_html=True)
-                                        st.markdown(f"## {cevap_json.get('en_uygun_takipci')}")
-                                        st.markdown("<small>Etkileşim Oranı</small>", unsafe_allow_html=True)
-                                        st.markdown(f"## {cevap_json.get('en_uygun_etkilesim')}")
-                                        
-                                        st.info(cevap_json.get('en_uygun_neden'))
-                                        st.link_button(f"🔗 {cevap_json.get('en_uygun_isim')} Profilini İncele", get_social_link(cevap_json.get('en_uygun_isim'), cevap_json.get('en_uygun_platform', 'Instagram')), use_container_width=True)
-                                        
-                                with col_kötü:
-                                    st.markdown('<div style="background-color:#FFEBEE; padding:10px; border-radius:5px;"><h3 style="color:#C62828; margin:0;">🔴 EN AZ UYGUN ADAY (Yüksek Risk / Düşük Verim)</h3></div>', unsafe_allow_html=True)
-                                    with st.container(border=True):
-                                        st.markdown(f"### ⚠️ {cevap_json.get('en_riskli_isim')}")
-                                        st.markdown(f"📊 Smart-Match Skoru: {cevap_json.get('en_riskli_sms', 70.0)} / 100")
-                                        try: st.progress(float(cevap_json.get('en_riskli_sms')) / 100)
-                                        except: st.progress(0.70)
-                                        st.caption(f"Segment: {cevap_json.get('en_riskli_segment')} | Platform: {cevap_json.get('en_riskli_platform')}")
-                                        
-                                        st.markdown("<br><small>Takipçi Sayısı</small>", unsafe_allow_html=True)
-                                        st.markdown(f"## {cevap_json.get('en_riskli_takipci')}")
-                                        st.markdown("<small>Etkileşim Oranı</small>", unsafe_allow_html=True)
-                                        st.markdown(f"## {cevap_json.get('en_riskli_etkilesim')}")
-                                        
-                                        st.warning(cevap_json.get('en_riskli_neden'))
-                                        st.link_button(f"🔗 {cevap_json.get('en_riskli_isim')} Profilini İncele", get_social_link(cevap_json.get('en_riskli_isim'), cevap_json.get('en_riskli_platform', 'Instagram')), use_container_width=True)
-                                        
-                                st.markdown("---")
-                                
-                                # --- 2. KISIM: REKLAM SENARYOLARI ---
-                                st.subheader("🎬 Kreatif Portfolyo & Video Senaryoları")
-                                st.write(cevap_json.get('kreatif_senaryolar'))
-                                
-                                st.markdown("---")
-                                
-                                # --- 3. KISIM: YASAL DANIŞMANLIK REHBERİ ---
-                                st.subheader("⚖️ Hukuki Mevzuat ve Yasal Zorunluluklar")
-                                st.write(cevap_json.get('yasal_zorunluluklar'))
-                                
-                                st.markdown("---")
-                                
-                                # --- 4. KISIM: RAPOR İNDİRME BUTONU ---
-                                tam_rapor = f"""=== AI INFLUENCER STRATEJİ RAPORU ===\n\n
-EN UYGUN INFLUENCER: {cevap_json.get('en_uygun_isim')}\nNeden: {cevap_json.get('en_uygun_neden')}\n\n
-EN RİSKLİ INFLUENCER: {cevap_json.get('en_riskli_isim')}\nNeden: {cevap_json.get('en_riskli_neden')}\n\n
-KREATİF REKLAM SENARYOLARI:\n{cevap_json.get('kreatif_senaryolar')}\n\n
-YASAL ZORUNLULUKLAR:\n{cevap_json.get('yasal_zorunluluklar')}"""
-
-                                st.download_button(
-                                    label="📥 Tam Strateji Raporunu Bilgisayara İndir (.txt)",
-                                    data=tam_rapor,
-                                    file_name="influ_match_ai_rapor.txt",
-                                    mime="text/plain",
-                                    use_container_width=True
-                                )
-                                
-                        except Exception as e:
-                            st.error(f"Hata oluştu: {e}")
+                            # Yapay zekaya kesin bütçe ve tip eşleştirme kurallarını veriyoruz
+                            butce_talimati = f"""
+                            KESİN BÜTÇE VE INFLUENCER TİPİ EŞLEŞTİRME KURALI: 
+                            Kullanıcı bütçe seçeneği olarak '{kampanya_butcesi}' modelini seçmiştir.
+                            Veritabanından influencer önerisi yaparken ŞU EŞLEŞTİRMELERE %100 UYMAK ZORUNDASIN:
                             
-        else:
-            st.markdown("### ⚖️ T.C. Ticaret Bakanlığı Reklam ve Influencer Mevzuat Danışmanı")
-            yasal_soru = st.text_area("❓ Sormak İstediğiniz Yasal Soru/Mevzuat Nedir?", placeholder="Örn: Instagram hikayelerinde iş birliği etiketi nereye konulmalı...", key="legal_query_box")
-            if st.button("⚖️ Kanun ve Mevzuata Göre İncele", key="groq_yasal_start"):
-                if not yasal_soru:
-                    st.warning("⚠️ Lütfen yasal sorunuzu buraya yazın.")
-                else:
-                    with st.spinner("📜 Mevzuat taranıyor..."):
-                        try:
-                            from groq import Groq
-                            client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-                            yasal_mesaj = f"Kullanıcı Sorusu: {yasal_soru}\nTicaret Bakanlığı Influencer kılavuzuna göre maddeler halinde yasal zorunlulukları açıkla."
-                            completion = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": yasal_mesaj}], temperature=0.1)
-                            st.success("⚖️ Hukuki Mevzuat Analizi Tamamlandı!")
+                            - Eğer 'Düşük Bütçe (Nano)' seçildiyse: SADECE 'Nano' tipindeki influencer'ları önerebilirsin.
+                            - Eğer 'Orta-Düşük Bütçe (Nano & Micro)' seçildiyse: SADECE 'Nano' ve 'Micro' tipindeki influencer'ları BİRLİKTE veya karma olarak önerebilirsin. (Macro ve Mega Kesinlikle Yasak!)
+                            - Eğer 'Orta Bütçe (Micro)' seçildiyse: SADECE 'Micro' tipindeki influencer'ları önerebilirsin.
+                            - Eğer 'Orta-Yüksek Bütçe (Macro & Mega)' seçildiyse: SADECE 'Macro' ve 'Mega' tipindeki influencer'ları BİRLİKTE veya karma olarak önerebilirsin. (Nano ve Micro Kesinlikle Yasak!)
+                            - Eğer 'Yüksek Bütçe (Mega)' seçildiyse: SADECE 'Mega' tipindeki influencer'ları önerebilirsin.
+                            """
+                            
+                            kullanici_mesaji = f"""
+                            Sen profesyonel bir Dijital Pazarlama Stratejistisi, Kreatif Reklam Yazarı ve Influencer Hukuku Danışmanısın.
+                            
+                            {butce_talimati}
+                            
+                            Yukarıdaki bütçe ve tip sınırlandırma kurallarına göre, sana aşağıda sağlanan influencer veritabanını filtrele ve kurallara uyan isimleri cımbızla seç.
+                            
+                            Mevcut Filtrelenmiş Influencer Veri Özeti:
+                            {veri_ozeti}
+                            
+                            Kullanıcının Kampanya Talebi:
+                            "{user_prompt}"
+                            
+                            Lütfen şu başlıklar altında harika bir Türkçe rapor hazırla:
+                            
+                            🎯 1. BÜTÇE ARALIĞINA UYGUN NOKTA ATIŞI INFLUENCER ÖNERİLERİ
+                            (Kullanıcının seçtiği {kampanya_butcesi} durumuna göre veritabanından bulduğun uygun isimleri, takipçi ve etkileşim oranlarıyla listele. Seçtiğin isimlerin bütçe kuralıyla neden uyumlu olduğunu açıkla.)
+                            
+                            🎬 2. KREATİF REKLAM SENARYO ÖNERİLERİ
+                            (Önerdiğin bu isimlerin tarzına, Instagram Reels ve TikTok formatına uygun, samimi en az 2 video senaryosu kurgula.)
+                            
+                            ⚖️ 3. YASAL ZORUNLULUKLAR VE DİKKAT EDİLMESİ GEREKENLER (TÜRKİYE MEVZUATI)
+                            (Ticaret Bakanlığı kurallarına göre #reklam/#işbirliği kullanımı ve kozmetik ürünlerdeki sağlık beyanı yasaklarını maddeler halinde yaz.)
+                            """
+                            
+                            completion = client.chat.completions.create(
+                                model="llama-3.3-70b-versatile",
+                                messages=[
+                                    {"role": "user", "content": kullanici_mesaji}
+                                ],
+                                temperature=0.3
+                            )
+                            
+                            ai_raporu = completion.choices[0].message.content
+                            
+                            st.success("✨ Esnek Bütçe Uyumlu Strateji ve Yasal Rapor Hazır!")
                             st.markdown("---")
-                            st.markdown(completion.choices[0].message.content)
-                        except Exception as e:
-                            st.error(f"AI Bağlantı Hatası: {e}")
+                            st.markdown(ai_raporu)
+                            st.markdown("---")
+                            
+                            st.download_button(
+                                label="📄 Raporu İndir",
+                                data=ai_raporu,
+                                file_name="esnek_butceli_reklam_raporu.txt",
+                                mime="text/plain",
+                                key="groq_download_button"
+                            )
+                            
+                    except Exception as ai_err:
+                        st.error(f"AI Analiz Motoru Hatası: {ai_err}")
