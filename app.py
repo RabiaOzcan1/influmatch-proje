@@ -145,7 +145,7 @@ else:
                         m2.metric("⚡ Etkileşim", f"%{row['etkilesim']}")
                         st.link_button("🌐 Profili Gör", get_social_link(row['ad'], row['platform']), use_container_width=True)
 
-    # --- TAB 2: SADECE KUTULU EN UYGUN VE EN KÖTÜ ADAY ANALİZİ ---
+    # --- TAB 2: KUTULU EN UYGUN VE EN KÖTÜ ADAY ANALİZİ ---
     with tab2:
         st.header("🧠 Akıllı Eşleştirme Motoru")
         with st.form("wizard_form_v9_fixed"):
@@ -210,7 +210,6 @@ else:
                         
                         cevap_json = json.loads(completion.choices[0].message.content)
                         
-                        # O meşhur görseldeki yeşil ve kırmızı kutu tasarımları
                         col_iyi, col_kötü = st.columns(2)
                         
                         with col_iyi:
@@ -257,108 +256,142 @@ else:
             st.plotly_chart(fig, use_container_width=True)
         st.dataframe(f_df, use_container_width=True)
 
-    # --- TAB 4: TAMAMEN SENİN İSTEDİĞİN GİBİ BÜTÇE AYARLI REKLAM SENARYOSU & YASAL DANIŞMAN ---
+    # --- TAB 4: RADYO BUTONLU VE SEKTÖR KORUMALI AI ASİSTAN PANELİ ---
     with tab4:
         st.header("🧠 Akıllı Reklam Senaryosu, Öneri ve Yasal Danışman")
-        st.markdown("Kampanya fikrinizi ve hedef kitlenizi yazın. AI, seçtiğiniz **bütçe aralığına tam uyan** influencer sınıflarını veritabanından süzerek size özel bir strateji ve yasal uyum raporu hazırlar.")
         
-        # --- GÜNCEL BÜTÇE SKALASI ---
-        kampanya_butcesi = st.selectbox(
-            "Kampanya Bütçeniz Nedir?",
-            options=[
-                "Düşük Bütçe (Nano)", 
-                "Orta-Düşük Bütçe (Nano & Micro)", 
-                "Orta Bütçe (Micro)", 
-                "Orta-Yüksek Bütçe (Macro & Mega)", 
-                "Yüksek Bütçe (Mega)"
-            ],
-            help="Seçtiğiniz bütçe aralığına uygun influencer tipleri yapay zekaya kesin kural olarak dikte edilir.",
-            key="groq_budget_selector"
+        # Orijinal radyo buton yapısını buraya entegre ettik
+        ai_modu = st.radio(
+            "💡 Yapay Zekayı Hangi Amaçla Kullanmak İstersiniz?",
+            options=["🎯 Reklam Senaryosu ve Bütçe Uyumlu Öneri Al", "⚖️ Sadece Yasal Soru Söyle (Mevzuat Danışmanı)"],
+            horizontal=True,
+            key="tab4_ai_mode_selector"
         )
         
-        user_prompt = st.text_area(
-            "Kampanya Detaylarını ve Hedef Kitleyi Yazın:",
-            placeholder="Örn: Yeni bir kozmetik markası çıkarıyoruz. Hedef kitlemiz 18-45 yaş arası ve kozmetik alanı. TikTok ve Instagram ana mecralarım. Muhtemel reklam senaryoları ve dikkat etmem gereken yasal zorunluluklar nelerdir?",
-            key="groq_user_prompt"
-        )
+        st.divider()
         
-        if st.button("Yapay Zeka Analizini Başlat 🚀", key="groq_start_button"):
-            if not user_prompt:
-                st.warning("Lütfen önce kampanya detaylarını yazın.")
-            else:
-                with st.spinner("Yapay Zeka bütçe filtrenize uygun analizleri hazırlıyor..."):
-                    try:
-                        from groq import Groq
-                        api_key = st.secrets.get("GROQ_API_KEY", None)
-                        
-                        if not api_key:
-                            st.error("Lütfen `.streamlit/secrets.toml` dosyasına GROQ_API_KEY anahtarınızı ekleyin.")
-                        else:
-                            client = Groq(api_key=api_key)
+        if ai_modu == "🎯 Reklam Senaryosu ve Bütçe Uyumlu Öneri Al":
+            st.markdown("Kampanya fikrinizi ve hedef kitlenizi yazın. AI, seçtiğiniz **bütçe aralığına tam uyan** influencer sınıflarını veritabanından süzerek size özel bir strateji ve yasal uyum raporu hazırlar.")
+            
+            # Alakasız infuların dökülmesini engelleyen kritik Sektör Seçim kutusu
+            kampanya_sektoru = st.selectbox("🎯 Reklam Yapacağınız Sektör Nedir?", options=sorted(list(df["sektor"].unique())), key="groq_sector_selector")
+            
+            kampanya_butcesi = st.selectbox(
+                "Kampanya Bütçeniz Nedir?",
+                options=[
+                    "Düşük Bütçe (Nano)", 
+                    "Orta-Düşük Bütçe (Nano & Micro)", 
+                    "Orta Bütçe (Micro)", 
+                    "Orta-Yüksek Bütçe (Macro & Mega)", 
+                    "Yüksek Bütçe (Mega)"
+                ],
+                help="Seçtiğiniz bütçe aralığına uygun influencer tipleri yapay zekaya kesin kural olarak dikte edilir.",
+                key="groq_budget_selector_tab4"
+            )
+            
+            user_prompt = st.text_area(
+                "Kampanya Detaylarını ve Hedef Kitleyi Yazın:",
+                placeholder="Örn: Yeni bir kozmetik markası çıkarıyoruz. Hedef kitlemiz 18-45 yaş arası ve kozmetik alanı. TikTok ve Instagram ana mecralarım. Muhtemel reklam senaryoları ve dikkat etmem gereken yasal zorunluluklar nelerdir?",
+                key="groq_user_prompt"
+            )
+            
+            if st.button("Yapay Zeka Analizini Başlat 🚀", key="groq_start_button"):
+                if not user_prompt:
+                    st.warning("Lütfen önce kampanya detaylarını yazın.")
+                else:
+                    with st.spinner("Yapay Zeka bütçe ve sektör filtrenize uygun analizleri hazırlıyor..."):
+                        try:
+                            from groq import Groq
+                            api_key = st.secrets.get("GROQ_API_KEY", None)
                             
-                            # Veritabanının özetini çıkartma
-                            veri_ozeti = f_df[['ad', 'sektor', 'tip', 'platform', 'takipci', 'etkilesim', 'SMS']].to_string(index=False)
+                            if not api_key:
+                                st.error("Lütfen `.streamlit/secrets.toml` dosyasına GROQ_API_KEY anahtarınızı ekleyin.")
+                            else:
+                                client = Groq(api_key=api_key)
+                                
+                                # Sektör Filtreleme Koruması: Sadece seçilen sektörü süzüp AI'a gönderiyoruz
+                                daraltilmis_df = df[df["sektor"] == kampanya_sektoru].copy()
+                                if daraltilmis_df.empty:
+                                    daraltilmis_df = df.copy() # Eğer o sektörde kimse yoksa emniyet kilidi
+                                    
+                                veri_ozeti = daraltilmis_df[['ad', 'sektor', 'tip', 'platform', 'takipci', 'etkilesim', 'SMS']].to_string(index=False)
+                                
+                                butce_talimati = f"""
+                                KESİN BÜTÇE VE INFLUENCER TİPİ EŞLEŞTİRME KURALI: 
+                                Kullanıcı bütçe seçeneği olarak '{kampanya_butcesi}' modelini seçmiştir.
+                                Veritabanından influencer önerisi yaparken ŞU EŞLEŞTİRMELERE %100 UYMAK ZORUNDASIN:
+                                
+                                - Eğer 'Düşük Bütçe (Nano)' seçildiyse: SADECE 'Nano' tipindeki influencer'ları önerebilirsin.
+                                - Eğer 'Orta-Düşük Bütçe (Nano & Micro)' seçildiyse: SADECE 'Nano' ve 'Micro' tipindeki influencer'ları BİRLİKTE veya karma olarak önerebilirsin. (Macro ve Mega Kesinlikle Yasak!)
+                                - Eğer 'Orta Bütçe (Micro)' seçildiyse: SADECE 'Micro' tipindeki influencer'ları önerebilirsin.
+                                - Eğer 'Orta-Yüksek Bütçe (Macro & Mega)' seçildiyse: SADECE 'Macro' ve 'Mega' tipindeki influencer'ları BİRLİKTE veya karma olarak önerebilirsin. (Nano ve Micro Kesinlikle Yasak!)
+                                - Eğer 'Yüksek Bütçe (Mega)' seçildiyse: SADECE 'Mega' tipindeki influencer'ları önerebilirsin.
+                                """
+                                
+                                kullanici_mesaji = f"""
+                                Sen profesyonel bir Dijital Pazarlama Stratejistisi, Kreatif Reklam Yazarı ve Influencer Hukuku Danışmanısın.
+                                
+                                {butce_talimati}
+                                
+                                Yukarıdaki bütçe ve tip sınırlandırma kurallarına göre, sana aşağıda sağlanan influencer veritabanını filtrele ve sadece '{kampanya_sektoru}' sektöründeki kurallara uyan isimleri cımbızla seç.
+                                
+                                Mevcut Filtrelenmiş Influencer Veri Özeti:
+                                {veri_ozeti}
+                                
+                                Kullanıcının Kampanya Talebi:
+                                "{user_prompt}"
+                                
+                                Lütfen şu başlıklar altında harika bir Türkçe rapor hazırla:
+                                
+                                🎯 1. BÜTÇE ARALIĞINA UYGUN NOKTA ATIŞI INFLUENCER ÖNERİLERİ
+                                (Kullanıcının seçtiği {kampanya_butcesi} durumuna göre veritabanından bulduğun uygun isimleri, takipçi ve etkileşim oranlarıyla listele. Seçtiğin isimlerin bütçe kuralıyla neden uyumlu olduğunu açıkla.)
+                                
+                                🎬 2. KREATİF REKLAM SENARYO ÖNERİLERİ
+                                (Önerdiğin bu isimlerin tarzına, Instagram Reels ve TikTok formatına uygun, samimi en az 2 video senaryosu kurgula.)
+                                
+                                ⚖️ 3. YASAL ZORUNLULUKLAR VE DİKKAT EDİLMESİ GEREKENLER (TÜRKİYE MEVZUATI)
+                                (Ticaret Bakanlığı kurallarına göre #reklam/#işbirliği kullanımı ve kozmetik ürünlerdeki sağlık beyanı yasaklarını maddeler halinde yaz.)
+                                """
+                                
+                                completion = client.chat.completions.create(
+                                    model="llama-3.3-70b-versatile",
+                                    messages=[{"role": "user", "content": kullanici_mesaji}],
+                                    temperature=0.3
+                                )
+                                
+                                ai_raporu = completion.choices[0].message.content
+                                
+                                st.success("✨ Esnek Bütçe Uyumlu Strateji ve Yasal Rapor Hazır!")
+                                st.markdown("---")
+                                st.markdown(ai_raporu)
+                                st.markdown("---")
+                                
+                                st.download_button(
+                                    label="📄 Raporu İndir",
+                                    data=ai_raporu,
+                                    file_name="esnek_butceli_reklam_raporu.txt",
+                                    mime="text/plain",
+                                    key="groq_download_button"
+                                )
+                                
+                        except Exception as ai_err:
+                            st.error(f"AI Analiz Motoru Hatası: {ai_err}")
                             
-                            # Yapay zekaya kesin bütçe ve tip eşleştirme kurallarını veriyoruz
-                            butce_talimati = f"""
-                            KESİN BÜTÇE VE INFLUENCER TİPİ EŞLEŞTİRME KURALI: 
-                            Kullanıcı bütçe seçeneği olarak '{kampanya_butcesi}' modelini seçmiştir.
-                            Veritabanından influencer önerisi yaparken ŞU EŞLEŞTİRMELERE %100 UYMAK ZORUNDASIN:
-                            
-                            - Eğer 'Düşük Bütçe (Nano)' seçildiyse: SADECE 'Nano' tipindeki influencer'ları önerebilirsin.
-                            - Eğer 'Orta-Düşük Bütçe (Nano & Micro)' seçildiyse: SADECE 'Nano' ve 'Micro' tipindeki influencer'ları BİRLİKTE veya karma olarak önerebilirsin. (Macro ve Mega Kesinlikle Yasak!)
-                            - Eğer 'Orta Bütçe (Micro)' seçildiyse: SADECE 'Micro' tipindeki influencer'ları önerebilirsin.
-                            - Eğer 'Orta-Yüksek Bütçe (Macro & Mega)' seçildiyse: SADECE 'Macro' ve 'Mega' tipindeki influencer'ları BİRLİKTE veya karma olarak önerebilirsin. (Nano ve Micro Kesinlikle Yasak!)
-                            - Eğer 'Yüksek Bütçe (Mega)' seçildiyse: SADECE 'Mega' tipindeki influencer'ları önerebilirsin.
-                            """
-                            
-                            kullanici_mesaji = f"""
-                            Sen profesyonel bir Dijital Pazarlama Stratejistisi, Kreatif Reklam Yazarı ve Influencer Hukuku Danışmanısın.
-                            
-                            {butce_talimati}
-                            
-                            Yukarıdaki bütçe ve tip sınırlandırma kurallarına göre, sana aşağıda sağlanan influencer veritabanını filtrele ve kurallara uyan isimleri cımbızla seç.
-                            
-                            Mevcut Filtrelenmiş Influencer Veri Özeti:
-                            {veri_ozeti}
-                            
-                            Kullanıcının Kampanya Talebi:
-                            "{user_prompt}"
-                            
-                            Lütfen şu başlıklar altında harika bir Türkçe rapor hazırla:
-                            
-                            🎯 1. BÜTÇE ARALIĞINA UYGUN NOKTA ATIŞI INFLUENCER ÖNERİLERİ
-                            (Kullanıcının seçtiği {kampanya_butcesi} durumuna göre veritabanından bulduğun uygun isimleri, takipçi ve etkileşim oranlarıyla listele. Seçtiğin isimlerin bütçe kuralıyla neden uyumlu olduğunu açıkla.)
-                            
-                            🎬 2. KREATİF REKLAM SENARYO ÖNERİLERİ
-                            (Önerdiğin bu isimlerin tarzına, Instagram Reels ve TikTok formatına uygun, samimi en az 2 video senaryosu kurgula.)
-                            
-                            ⚖️ 3. YASAL ZORUNLULUKLAR VE DİKKAT EDİLMESİ GEREKENLER (TÜRKİYE MEVZUATI)
-                            (Ticaret Bakanlığı kurallarına göre #reklam/#işbirliği kullanımı ve kozmetik ürünlerdeki sağlık beyanı yasaklarını maddeler halinde yaz.)
-                            """
-                            
-                            completion = client.chat.completions.create(
-                                model="llama-3.3-70b-versatile",
-                                messages=[
-                                    {"role": "user", "content": kullanici_mesaji}
-                                ],
-                                temperature=0.3
-                            )
-                            
-                            ai_raporu = completion.choices[0].message.content
-                            
-                            st.success("✨ Esnek Bütçe Uyumlu Strateji ve Yasal Rapor Hazır!")
+        else:
+            st.markdown("### ⚖️ T.C. Ticaret Bakanlığı Reklam ve Influencer Mevzuat Danışmanı")
+            yasal_soru = st.text_area("❓ Sormak İstediğiniz Yasal Soru/Mevzuat Nedir?", placeholder="Örn: Instagram hikayelerinde iş birliği etiketi nereye konulmalı...", key="legal_query_box_tab4")
+            if st.button("⚖️ Kanun ve Mevzuata Göre İncele", key="groq_yasal_start_tab4"):
+                if not yasal_soru:
+                    st.warning("⚠️ Lütfen yasal sorunuzu buraya yazın.")
+                else:
+                    with st.spinner("📜 Mevzuat taranıyor..."):
+                        try:
+                            from groq import Groq
+                            client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+                            yasal_mesaj = f"Kullanıcı Sorusu: {yasal_soru}\nTicaret Bakanlığı Influencer kılavuzuna göre maddeler halinde yasal zorunlulukları açıkla."
+                            completion = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": yasal_mesaj}], temperature=0.1)
+                            st.success("⚖️ Hukuki Mevzuat Analizi Tamamlandı!")
                             st.markdown("---")
-                            st.markdown(ai_raporu)
-                            st.markdown("---")
-                            
-                            st.download_button(
-                                label="📄 Raporu İndir",
-                                data=ai_raporu,
-                                file_name="esnek_butceli_reklam_raporu.txt",
-                                mime="text/plain",
-                                key="groq_download_button"
-                            )
-                            
-                    except Exception as ai_err:
-                        st.error(f"AI Analiz Motoru Hatası: {ai_err}")
+                            st.markdown(completion.choices[0].message.content)
+                        except Exception as e:
+                            st.error(f"AI Bağlantı Hatası: {e}")
