@@ -141,7 +141,7 @@ else:
     if secilen_kategori != "Tümü": f_df = f_df[f_df["sektor"] == secilen_kategori]
     if st.session_state['pre_selected_type'] != "Tümü": f_df = f_df[f_df["tip"] == st.session_state['pre_selected_type']]
 
-    tab1, tab2, tab3, tab4 = st.tabs(["💎 Influencer Vitrini", "🧙‍♂️ Akıllı Sihirbaz", "📈 Veri Analizi", "🤖 AI Serbest Arama"])
+    tab1, tab2, tab3, tab4 = st.tabs(["💎 Influencer Vitrini", "🧙‍♂️ Akıllı Sihirbaz", "📈 Veri Analizi", "🤖 AI Asistan & Sihirbaz"])
     
     with tab1:
         st.header("✨ Influencer Arama ve Portföy Vitrini")
@@ -175,7 +175,7 @@ else:
             res = df[(df["sektor"] == w_sektor) & (df["tip"].isin(w_tipler))]
             if len(res) >= 1:
                 best = res.sort_values(by="SMS", ascending=False).iloc[0]
-                st.success(f"🥇 EN UYGUN ADAY: {best['ad']} (Skor: {best['SMS']})")
+                st.success(f"🥇 EN UYGUN ADAY: {best['ad']} (Smart-Match Skoru: {best['SMS']}/100)")
             else:
                 st.warning("⚠️ Seçilen kriterlere uygun influencer bulunamadı.")
 
@@ -186,90 +186,145 @@ else:
             st.plotly_chart(fig, use_container_width=True)
         st.dataframe(f_df, use_container_width=True)
 
-    # --- TAB 4: MOD SEÇİMLİ VE YASAL DESTEKLİ AI MOTORU ---
+    # --- TAB 4: MOD SEÇİMLİ, BÜTÇE DUYARLI VE AI INSIGHT DESTEKLİ MOTOR ---
     with tab4:
-        st.header("🤖 InfluMatch Akıllı AI Asistanı")
+        st.header("🤖 InfluMatch Akıllı AI Asistanı & Sihirbazı")
         
-        # YENİ ÖZELLİK: Çalışma Modu Seçimi
         ai_modu = st.radio(
             "💡 Yapay Zekayı Hangi Amaçla Kullanmak İstersiniz?",
             options=["🎯 Reklam Senaryosu ve Influencer Önerisi Al", "⚖️ Sadece Yasal Soru Sor (Mevzuat Danışmanı)"],
-            horizontal=True
+            horizontal=True,
+            key="ai_mode_selector"
         )
         
         st.divider()
         
-        # Eğer Reklam Senaryosu seçilirse filtreleri göster
+        # MOD 1: REKLAM SENARYOSU VE YAPAY ZEKA SİHİRBAZI
         if ai_modu == "🎯 Reklam Senaryosu ve Influencer Önerisi Al":
-            st.markdown("Kampanya hedeflerinizi yazın. Sistem, seçtiğiniz sektöre göre verileri süzerek nokta atışı senaryo kurgular.")
+            st.markdown("Kampanya hedeflerinizi yazın. Sistem, seçtiğiniz bütçeye ve sektöre göre verileri süzerek **En İdeal** ve **En Riskli** adayları belirler, senaryolar hazırlar.")
             
-            kampanya_sektoru = st.selectbox("🎯 Reklam Yapacağınız Sektör Nedir?", options=sorted(list(df["sektor"].unique())))
+            kampanya_sektoru = st.selectbox("🎯 Reklam Yapacağınız Sektör Nedir?", options=sorted(list(df["sektor"].unique())), key="ai_sector")
             
             kampanya_butcesi = st.selectbox(
                 "💰 Kampanya Bütçeniz Nedir?",
-                options=["Düşük Bütçe (Nano)", "Orta-Düşük Bütçe (Nano & Micro)", "Orta Bütçe (Micro)", "Orta-Yüksek Bütçe (Macro & Mega)", "Yüksek Bütçe (Mega)"]
+                options=["Düşük Bütçe (Nano)", "Orta-Düşük Bütçe (Nano & Micro)", "Orta Bütçe (Micro)", "Orta-Yüksek Bütçe (Macro & Mega)", "Yüksek Bütçe (Mega)"],
+                key="ai_budget"
             )
             
-            user_prompt = st.text_area("📝 Kampanya Detaylarını ve İsteklerinizi Yazın:", placeholder="Örn: Yeni mobil oyunumuz için bütçemize uygun reklam senaryoları...")
+            user_prompt = st.text_area("📝 Kampanya Detaylarını ve İsteklerinizi Yazın:", placeholder="Örn: Yeni kozmetik serimiz için bütçemize uygun reklam senaryoları ve isim önerileri...", key="ai_prompt")
             
             if st.button("🚀 Yapay Zeka Analizini Başlat", key="groq_senaryo_start"):
                 if not user_prompt:
                     st.warning("⚠️ Lütfen kampanya detaylarını boş bırakmayın.")
                 else:
-                    with st.spinner("🧠 Yapay zeka alakasız tüm sektörleri eliyor ve bütçeyi optimize ediyor..."):
+                    with st.spinner("🧠 Yapay zeka veritabanını tarıyor, bütçeyi optimize ediyor ve AI Insight raporunu hazırlıyor..."):
                         try:
+                            import json
+                            from groq import Groq
+                            
+                            # Sektör filtreleme
                             ai_df = df[df["sektor"].astype(str).str.contains(kampanya_sektoru, case=False, na=False)].copy()
                             
                             if ai_df.empty:
                                 st.error(f"❌ Veri tabanında '{kampanya_sektoru}' sektörüne ait hiçbir influencer bulunamadı.")
-                                st.stop()
-                            
-                            bütçe_notu = ""
-                            if "Düşük Bütçe (Nano)" in kampanya_butcesi:
-                                temp_df = ai_df[ai_df["tip"].astype(str).str.contains("Nano", case=False, na=False)]
-                                if temp_df.empty:
-                                    ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Micro", case=False, na=False)]
-                                    bütçe_notu = "⚠️ Not: Seçtiğiniz sektörde 'Nano' influencer bulunmadığı için sistem otomatik olarak en yakın bütçeli 'Micro' segmentine geçiş yapmıştır."
-                                else:
-                                    ai_df = temp_df
-                            elif "Orta-Düşük Bütçe (Nano & Micro)" in kampanya_butcesi:
-                                ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Nano|Micro", case=False, na=False)]
-                            elif "Orta Bütçe (Micro)" in kampanya_butcesi:
-                                ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Micro", case=False, na=False)]
-                            elif "Orta-Yüksek Bütçe (Macro & Mega)" in kampanya_butcesi:
-                                ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Macro|Mega", case=False, na=False)]
-                            elif "Yüksek Bütçe (Mega)" in kampanya_butcesi:
-                                ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Mega", case=False, na=False)]
-
-                            if ai_df.empty:
-                                st.error(f"❌ Kriterlerinize uygun bir influencer kombinasyonu bulunamadı.")
                             else:
-                                from groq import Groq
+                                bütçe_notu = ""
+                                # Bütçeye göre tip filtreleme
+                                if "Düşük Bütçe (Nano)" in kampanya_butcesi:
+                                    temp_df = ai_df[ai_df["tip"].astype(str).str.contains("Nano", case=False, na=False)]
+                                    if temp_df.empty:
+                                        ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Micro", case=False, na=False)]
+                                        bütçe_notu = "⚠️ Not: Sektörde 'Nano' aday bulunmadığından otomatik 'Micro' segmentine geçildi."
+                                    else:
+                                        ai_df = temp_df
+                                elif "Orta-Düşük Bütçe (Nano & Micro)" in kampanya_butcesi:
+                                    ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Nano|Micro", case=False, na=False)]
+                                elif "Orta Bütçe (Micro)" in kampanya_butcesi:
+                                    ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Micro", case=False, na=False)]
+                                elif "Orta-Yüksek Bütçe (Macro & Mega)" in kampanya_butcesi:
+                                    ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Macro|Mega", case=False, na=False)]
+                                elif "Yüksek Bütçe (Mega)" in kampanya_butcesi:
+                                    ai_df = ai_df[ai_df["tip"].astype(str).str.contains("Mega", case=False, na=False)]
+
                                 api_key = st.secrets.get("GROQ_API_KEY", None)
-                                if api_key:
+                                if not api_key:
+                                    st.error("❌ `secrets.toml` içerisinde GROQ_API_KEY anahtarı bulunamadı!")
+                                else:
                                     client = Groq(api_key=api_key)
                                     veri_ozeti = ai_df[['ad', 'sektor', 'tip', 'platform', 'takipci', 'etkilesim', 'SMS']].to_string(index=False)
                                     
-                                    kullanici_mesaji = f"""
-                                    Sen uzman bir dijital pazarlama direktörüsün. Kullanıcı sadece '{kampanya_sektoru}' alanında çalışıyor.
-                                    Veri kümesi: {veri_ozeti}
-                                    İstek: {user_prompt}
-                                    Görev: Sadece listedeki kişileri kullanarak '{kampanya_sektoru}' odaklı kreatif reklam senaryoları yaz ve bakanlık mevzuat uyarılarını ekle.
+                                    sistem_talimati = f"""
+                                    Sen uzman bir dijital pazarlama direktörü ve veri analistisin. Kullanıcı '{kampanya_sektoru}' alanında kampanya yapıyor.
+                                    Aşağıdaki veri kümesinde yer alan influencer'ların 'SMS' sütunu onların Smart-Match (Akıllı Eşleşme) skorudur.
+                                    
+                                    GÖREV:
+                                    1. Verilen listeden SMS skoru, etkileşimi ve hedef kitle uyumu en yüksek olan 'En İdeal Adayı' seç.
+                                    2. Verilen listeden veya genel veri tabanından bu senaryoya, bütçeye veya sektöre en az uyum sağlayan 'En Riskli / Uygun Olmayan Adayı' seç.
+                                    3. Seçilen ideal adaylara özel kreatif video senaryoları yaz.
+                                    4. Türkiye Cumhuriyeti Ticaret Bakanlığı mevzuat uyarılarını ekle.
+                                    
+                                    Senden çıktıyı MUTLAKA şu JSON formatında vermeni bekliyorum. JSON dışında hiçbir metin yazma:
+                                    {{
+                                        "en_ideal_aday": "En yüksek uyumlu influencer ismi ve Smart-Match Skoru",
+                                        "en_ideal_neden": "Bu adayın portföy, etkileşim oranı ve SMS skoru baz alınarak neden en iyi tercih olduğunun matematiksel açıklaması",
+                                        "en_riskli_aday": "Bu kampanya/bütçe için en uygunsuz olan influencer ismi ve Smart-Match Skoru",
+                                        "en_riskli_neden": "Bu adayın bütçe aşımı, alakasız sektör veya düşük etkileşim nedeniyle neden riskli olduğunun açıklaması",
+                                        "kreatif_senaryolar": "Önerilen ideal isimlerin tarzına uygun, Instagram Reels ve TikTok odaklı kreatif senaryolar",
+                                        "yasal_mevzuat": "Ticaret Bakanlığı kurallarına göre reklam etiketleme ve kozmetik/sağlık beyanı kısıtlamaları kuralları"
+                                    }}
+
+                                    Veri kümesi:
+                                    {veri_ozeti}
+
+                                    Kullanıcı İsteği:
+                                    "{user_prompt}"
                                     """
-                                    completion = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": kullanici_mesaji}], temperature=0.1)
-                                    st.success("🎉 Senaryo Raporu Hazır!")
+                                    
+                                    completion = client.chat.completions.create(
+                                        model="llama-3.3-70b-versatile",
+                                        messages=[{"role": "user", "content": sistem_talimati}],
+                                        temperature=0.2,
+                                        response_format={"type": "json_object"}
+                                    )
+                                    
+                                    # JSON Ayrıştırma
+                                    cevap_json = json.loads(completion.choices[0].message.content)
+                                    
+                                    st.success("🎉 Yapay Zeka Sihirbaz Analizi Tamamlandı!")
                                     if bütçe_notu: st.warning(bütçe_notu)
                                     st.markdown("---")
-                                    st.markdown(completion.choices[0].message.content)
+                                    
+                                    # --- GÖRSEL AI INSIGHT BÖLÜMÜ ---
+                                    st.subheader("🎯 AI Insight: Sihirbaz Eşleştirmesi")
+                                    col_iyi, col_kotu = st.columns(2)
+                                    
+                                    with col_iyi:
+                                        st.success(f"🏆 **En İdeal Aday: {cevap_json.get('en_ideal_aday')}**")
+                                        st.info(cevap_json.get('en_ideal_neden'))
+                                        
+                                    with col_kotu:
+                                        st.error(f"⚠️ **En Riskli / Uygun Olmayan: {cevap_json.get('en_riskli_aday')}**")
+                                        st.warning(cevap_json.get('en_riskli_neden'))
+                                        
+                                    st.markdown("---")
+                                    
+                                    # --- SENARYOLAR VE YASAL BÖLÜM ---
+                                    st.subheader("🎬 Kreatif Video Senaryoları")
+                                    st.markdown(cevap_json.get('kreatif_senaryolar'))
+                                    
+                                    st.markdown("---")
+                                    st.subheader("⚖️ Hukuki Mevzuat ve Yasal Zorunluluklar")
+                                    st.markdown(cevap_json.get('yasal_mevzuat'))
+                                    
                         except Exception as e:
                             st.error(f"Hata: {e}")
                             
-        # YENİ ÖZELLİK: Eğer Yasal Soru Sor seçilirse bütçe/sektör gizlenir, sadece soru alanı kalır
+        # MOD 2: SADECE YASAL MEVZUAT DANIŞMANI
         else:
             st.markdown("### ⚖️ T.C. Ticaret Bakanlığı Reklam ve Influencer Mevzuat Danışmanı")
             st.markdown("Gizli reklam yasakları, sosyal medyada hashtag kullanımı (`#işbirliği`), sponsorlu içerik kuralları veya ceza maddeleri hakkında merak ettiğiniz her şeyi sorun.")
             
-            yasal_soru = st.text_area("❓ Sormak İstediğiniz Yasal Soru/Mevzuat Nedir?", placeholder="Örn: Instagram hikayelerinde iş birliği etiketi nereye konulmalı, uymamanın cezası nedir?")
+            yasal_soru = st.text_area("❓ Sormak İstediğiniz Yasal Soru/Mevzuat Nedir?", placeholder="Örn: Instagram hikayelerinde iş birliği etiketi nereye konulmalı, uymamanın cezası nedir?", key="legal_query_box")
             
             if st.button("⚖️ Kanun ve Mevzuata Göre İncele", key="groq_yasal_start"):
                 if not yasal_soru:
@@ -291,7 +346,7 @@ else:
                                 "{yasal_soru}"
                                 
                                 Lütfen bu soruyu şu kurallara göre cevapla:
-                                1. Net ve yasal maddelere dayanan (Örn: Sosyal Medya Etkileyicileri Tarafından Yapılan Ticari Reklam ve Haksız Ticari Uygulamalar Hakkında Kılavuz) bilgiler ver.
+                                1. Net ve yasal maddelere dayanan (Örn: Sosyal Medya Etkileyicileri Tarafından Yapılan Ticari Reklam ve Haksız Ticari Uygulamalar Haksız Ticari Uygulamalar Hakkında Kılavuz) bilgiler ver.
                                 2. #İşbirliği, #Reklam gibi etiketlerin hangi platformda (YouTube, Instagram, TikTok vb.) nasıl, hangi boyutta ve nerede konumlandırılması gerektiğini açıkla.
                                 3. Olası ihlal durumunda Reklam Kurulu'nun uygulayabileceği idari para cezası veya durdurma cezası risklerinden bahset.
                                 4. Tamamen Türkçe ve profesyonel bir hukuki/danışmanlık dili kullan.
